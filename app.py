@@ -1,8 +1,8 @@
 import os
 import streamlit as st
 from crewai import Agent, Task, Crew, LLM
+from crewai.tools import tool
 from duckduckgo_search import DDGS
-from langchain.tools import tool
 
 # Set Streamlit Page Configuration
 st.set_page_config(
@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- CUSTOM TOOL DEFINITION ---
+# --- CUSTOM SEARCH TOOL DEFINITION ---
 @tool("DuckDuckGo Internet Search")
 def web_search_tool(query: str) -> str:
     """Useful for searching the web for current events, facts, and up-to-date research topics."""
@@ -72,7 +72,6 @@ if generate_btn:
     elif not research_topic.strip():
         st.warning("Please provide a topic for the research agent.")
     else:
-        # Set environment variable for Groq
         os.environ["GROQ_API_KEY"] = groq_api_key
 
         with st.status("🔍 Research Agent at Work...", expanded=True) as status:
@@ -133,11 +132,9 @@ if generate_btn:
                 st.markdown("### 📄 Generated Research Report")
                 st.markdown("---")
                 
-                # Render report output
                 report_text = str(result)
                 st.markdown(report_text)
 
-                # Download Option
                 st.download_button(
                     label="📥 Download Report as Markdown",
                     data=report_text,
@@ -148,4 +145,4 @@ if generate_btn:
             except Exception as e:
                 status.update(label="❌ Error Occurred", state="error", expanded=True)
                 st.error(f"Execution failed: {str(e)}")
-              
+        
