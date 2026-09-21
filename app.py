@@ -1,8 +1,12 @@
 import os
+import litellm
 import streamlit as st
 from crewai import Agent, Task, Crew, LLM
 from crewai.tools import tool
 from duckduckgo_search import DDGS
+
+# Force LiteLLM to drop unsupported parameters like cache_breakpoint for Groq
+litellm.drop_params = True
 
 # Set Streamlit Page Configuration
 st.set_page_config(
@@ -36,7 +40,6 @@ def web_search_tool(query: str) -> str:
 # --- API KEY MANAGEMENT ---
 st.sidebar.title("⚙️ Agent Settings")
 
-# Check if GROQ_API_KEY exists in Streamlit Secrets
 secret_api_key = st.secrets.get("GROQ_API_KEY", "")
 
 if secret_api_key:
@@ -49,7 +52,6 @@ else:
         help="Enter your Groq API key (starts with 'gsk_')"
     )
 
-# Model Selection
 model_choice = st.sidebar.selectbox(
     "Select Model",
     options=["groq/openai/gpt-oss-120b", "groq/openai/gpt-oss-20b"],
@@ -78,14 +80,13 @@ if generate_btn:
     elif not research_topic.strip():
         st.warning("Please provide a topic for the research agent.")
     else:
-        # Set environment keys for LiteLLM / CrewAI backend
         os.environ["GROQ_API_KEY"] = groq_api_key
 
         with st.status("🔍 Research Agent at Work...", expanded=True) as status:
             try:
                 st.write("Initializing Groq LLM...")
                 
-                # Native CrewAI LLM wrapper targeting Groq
+                # CrewAI LLM configured to drop unsupported flags
                 llm = LLM(
                     model=model_choice,
                     api_key=groq_api_key,
@@ -105,7 +106,7 @@ if generate_btn:
                     llm=llm,
                     verbose=True,
                     allow_delegation=False,
-                    cache=False  # Disables internal prompt caching parameters for Groq compatibility
+                    cache=False
                 )
 
                 st.write("Formulating research tasks...")
@@ -128,7 +129,7 @@ if generate_btn:
                     agents=[research_agent],
                     tasks=[research_task],
                     verbose=True,
-                    memory=False  # Prevents unnecessary backend caching calls
+                    memory=False
                 )
 
                 result = crew.kickoff()
