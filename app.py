@@ -33,15 +33,21 @@ def web_search_tool(query: str) -> str:
         return f"Error executing internet search: {str(e)}"
 
 
-# --- SIDEBAR CONFIGURATION ---
+# --- API KEY MANAGEMENT (Streamlit Secrets + Fallback) ---
 st.sidebar.title("⚙️ Agent Settings")
 
-# API Key input
-groq_api_key = st.sidebar.text_input(
-    "Groq API Key",
-    type="password",
-    help="Enter your Groq API key (starts with 'gsk_')"
-)
+# Check if GROQ_API_KEY exists in Streamlit Secrets
+secret_api_key = st.secrets.get("GROQ_API_KEY", "")
+
+if secret_api_key:
+    groq_api_key = secret_api_key
+    st.sidebar.success("✅ Groq API Key loaded from Streamlit Secrets!")
+else:
+    groq_api_key = st.sidebar.text_input(
+        "Groq API Key",
+        type="password",
+        help="Enter your Groq API key (starts with 'gsk_')"
+    )
 
 # Model Selection
 model_choice = st.sidebar.selectbox(
@@ -68,23 +74,23 @@ generate_btn = st.button("🚀 Start Research", type="primary", use_container_wi
 # --- CREWAI EXECUTION LOGIC ---
 if generate_btn:
     if not groq_api_key.strip():
-        st.error("Please enter a valid Groq API Key in the sidebar before proceeding.")
+        st.error("Please enter a valid Groq API Key in the sidebar or save it in Streamlit Secrets.")
     elif not research_topic.strip():
         st.warning("Please provide a topic for the research agent.")
     else:
+        # Set environment variables for CrewAI / LiteLLM
         os.environ["GROQ_API_KEY"] = groq_api_key
 
         with st.status("🔍 Research Agent at Work...", expanded=True) as status:
             try:
-                # 1. Initialize LLM via CrewAI's LLM Wrapper
                 st.write("Initializing language model...")
+                # Initialize LLM via LiteLLM syntax in CrewAI
                 llm = LLM(
                     model=f"groq/{model_choice}",
                     api_key=groq_api_key,
                     temperature=0.3
                 )
 
-                # 2. Define Single Research Agent
                 st.write("Configuring Research Agent...")
                 research_agent = Agent(
                     role="Senior Academic & Technical Researcher",
@@ -100,7 +106,6 @@ if generate_btn:
                     allow_delegation=False
                 )
 
-                # 3. Define Task
                 st.write("Formulating research tasks...")
                 research_task = Task(
                     description=(
@@ -116,7 +121,6 @@ if generate_btn:
                     agent=research_agent
                 )
 
-                # 4. Form Crew with Single Agent
                 st.write("Running CrewAI Orchestration...")
                 crew = Crew(
                     agents=[research_agent],
@@ -124,7 +128,6 @@ if generate_btn:
                     verbose=True
                 )
 
-                # Execute
                 result = crew.kickoff()
                 status.update(label="✅ Research Complete!", state="complete", expanded=False)
 
@@ -145,4 +148,4 @@ if generate_btn:
             except Exception as e:
                 status.update(label="❌ Error Occurred", state="error", expanded=True)
                 st.error(f"Execution failed: {str(e)}")
-        
+            
