@@ -1,12 +1,9 @@
 import os
-import litellm
 import streamlit as st
 from crewai import Agent, Task, Crew, LLM
 from crewai.tools import tool
 from duckduckgo_search import DDGS
-
-# Force LiteLLM to drop unsupported parameters like cache_breakpoint for Groq
-litellm.drop_params = True
+from langchain_groq import ChatGroq
 
 # Set Streamlit Page Configuration
 st.set_page_config(
@@ -54,7 +51,7 @@ else:
 
 model_choice = st.sidebar.selectbox(
     "Select Model",
-    options=["groq/openai/gpt-oss-120b", "groq/openai/gpt-oss-20b"],
+    options=["openai/gpt-oss-120b", "openai/gpt-oss-20b"],
     help="Select the Groq-hosted model to power your agent."
 )
 
@@ -84,13 +81,20 @@ if generate_btn:
 
         with st.status("🔍 Research Agent at Work...", expanded=True) as status:
             try:
-                st.write("Initializing Groq LLM...")
+                st.write("Initializing Groq LLM via ChatGroq...")
                 
-                # CrewAI LLM configured to drop unsupported flags
+                # 1. Initialize LangChain's ChatGroq class
+                groq_chat = ChatGroq(
+                    groq_api_key=groq_api_key,
+                    model_name=model_choice,
+                    temperature=0.3
+                )
+
+                # 2. Wrap it inside CrewAI's LLM container
                 llm = LLM(
                     model=model_choice,
                     api_key=groq_api_key,
-                    temperature=0.3
+                    llm=groq_chat
                 )
 
                 st.write("Configuring Research Agent...")
@@ -105,8 +109,7 @@ if generate_btn:
                     tools=[web_search_tool],
                     llm=llm,
                     verbose=True,
-                    allow_delegation=False,
-                    cache=False
+                    allow_delegation=False
                 )
 
                 st.write("Formulating research tasks...")
@@ -128,8 +131,7 @@ if generate_btn:
                 crew = Crew(
                     agents=[research_agent],
                     tasks=[research_task],
-                    verbose=True,
-                    memory=False
+                    verbose=True
                 )
 
                 result = crew.kickoff()
