@@ -1,9 +1,8 @@
 import os
 import streamlit as st
-from crewai import Agent, Task, Crew
+from crewai import Agent, Task, Crew, LLM
 from crewai.tools import tool
 from duckduckgo_search import DDGS
-from langchain_openai import ChatOpenAI
 
 # Set Streamlit Page Configuration
 st.set_page_config(
@@ -34,7 +33,7 @@ def web_search_tool(query: str) -> str:
         return f"Error executing internet search: {str(e)}"
 
 
-# --- API KEY MANAGEMENT (Streamlit Secrets + Fallback) ---
+# --- API KEY MANAGEMENT ---
 st.sidebar.title("⚙️ Agent Settings")
 
 # Check if GROQ_API_KEY exists in Streamlit Secrets
@@ -53,12 +52,12 @@ else:
 # Model Selection
 model_choice = st.sidebar.selectbox(
     "Select Model",
-    options=["openai/gpt-oss-120b", "openai/gpt-oss-20b"],
+    options=["groq/openai/gpt-oss-120b", "groq/openai/gpt-oss-20b"],
     help="Select the Groq-hosted model to power your agent."
 )
 
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Tip:** Obtain your free API key at [consolegroq.com](https://console.groq.com).")
+st.sidebar.info("💡 **Tip:** Obtain your free API key at [console.groq.com](https://console.groq.com).")
 
 
 # --- MAIN INTERFACE ---
@@ -79,16 +78,17 @@ if generate_btn:
     elif not research_topic.strip():
         st.warning("Please provide a topic for the research agent.")
     else:
+        # Set environment keys for LiteLLM / CrewAI backend
+        os.environ["GROQ_API_KEY"] = groq_api_key
+
         with st.status("🔍 Research Agent at Work...", expanded=True) as status:
             try:
-                st.write("Initializing Groq LLM endpoint...")
+                st.write("Initializing Groq LLM...")
                 
-                # Initialize Groq via OpenAI-compatible ChatOpenAI interface
-                # This bypasses LiteLLM parameter incompatibility (cache_breakpoint error)
-                groq_llm = ChatOpenAI(
-                    model_name=model_choice,
-                    openai_api_key=groq_api_key,
-                    openai_api_base="https://api.groq.com/openai/v1",
+                # Native CrewAI LLM wrapper targeting Groq
+                llm = LLM(
+                    model=model_choice,
+                    api_key=groq_api_key,
                     temperature=0.3
                 )
 
@@ -102,9 +102,10 @@ if generate_btn:
                         "synthesizing research into clean, structured reports."
                     ),
                     tools=[web_search_tool],
-                    llm=groq_llm,
+                    llm=llm,
                     verbose=True,
-                    allow_delegation=False
+                    allow_delegation=False,
+                    cache=False  # Disables internal prompt caching parameters for Groq compatibility
                 )
 
                 st.write("Formulating research tasks...")
@@ -126,7 +127,8 @@ if generate_btn:
                 crew = Crew(
                     agents=[research_agent],
                     tasks=[research_task],
-                    verbose=True
+                    verbose=True,
+                    memory=False  # Prevents unnecessary backend caching calls
                 )
 
                 result = crew.kickoff()
