@@ -1,8 +1,9 @@
 import os
 import streamlit as st
-from crewai import Agent, Task, Crew, LLM
+from crewai import Agent, Task, Crew
 from crewai.tools import tool
 from duckduckgo_search import DDGS
+from langchain_openai import ChatOpenAI
 
 # Set Streamlit Page Configuration
 st.set_page_config(
@@ -57,7 +58,7 @@ model_choice = st.sidebar.selectbox(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Tip:** Obtain your free API key at [console.groq.com](https://console.groq.com).")
+st.sidebar.info("💡 **Tip:** Obtain your free API key at [consolegroq.com](https://console.groq.com).")
 
 
 # --- MAIN INTERFACE ---
@@ -78,16 +79,16 @@ if generate_btn:
     elif not research_topic.strip():
         st.warning("Please provide a topic for the research agent.")
     else:
-        # Set environment variables for CrewAI / LiteLLM
-        os.environ["GROQ_API_KEY"] = groq_api_key
-
         with st.status("🔍 Research Agent at Work...", expanded=True) as status:
             try:
-                st.write("Initializing language model...")
-                # Initialize LLM via LiteLLM syntax in CrewAI
-                llm = LLM(
-                    model=f"groq/{model_choice}",
-                    api_key=groq_api_key,
+                st.write("Initializing Groq LLM endpoint...")
+                
+                # Initialize Groq via OpenAI-compatible ChatOpenAI interface
+                # This bypasses LiteLLM parameter incompatibility (cache_breakpoint error)
+                groq_llm = ChatOpenAI(
+                    model_name=model_choice,
+                    openai_api_key=groq_api_key,
+                    openai_api_base="https://api.groq.com/openai/v1",
                     temperature=0.3
                 )
 
@@ -101,7 +102,7 @@ if generate_btn:
                         "synthesizing research into clean, structured reports."
                     ),
                     tools=[web_search_tool],
-                    llm=llm,
+                    llm=groq_llm,
                     verbose=True,
                     allow_delegation=False
                 )
@@ -148,4 +149,4 @@ if generate_btn:
             except Exception as e:
                 status.update(label="❌ Error Occurred", state="error", expanded=True)
                 st.error(f"Execution failed: {str(e)}")
-            
+                
